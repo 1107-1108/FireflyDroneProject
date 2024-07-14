@@ -6,7 +6,7 @@
 
 如果有任何建议请联系[1107@siwg.top](mailto:1107@siwg.top)
 
-感谢来自 Tyxc127, tyism1r3hk, Li3Fish的帮助
+感谢来自 Tyxc127, tyism1r3hk, [Li3Fish](https://github.com/LiPolymer/)的帮助
 
 以及各路亲戚的压岁钱支持！
 
