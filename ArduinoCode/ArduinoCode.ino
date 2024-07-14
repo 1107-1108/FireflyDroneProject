@@ -13,8 +13,8 @@ int MOTOR_2_PIN = 22;
 int MOTOR_3_PIN = 21;
 int MOTOR_4_PIN = 18;
 
-int MPU_PIN_SDA = 27;
-int MPU_PIN_SCL = 26;
+int MPU_PIN_SDA = 21;
+int MPU_PIN_SCL = 19;
 
 //MS5611 MS5611(0x77);
 MPU6050 mpu6050(Wire);
@@ -76,12 +76,6 @@ float calculateAltitude(float currentPressure, float currentTemperature) {
   return height;
 }
 
-int q0, q1, q2, q3 = 0;
-
-float roll, pitch, yaw = 0;
-
-float ax, ay, az, gx, gy, gz;
-
 void IMU_update(float gx, float gy, float gz, float ax, float ay, float az, float &roll, float &pitch, float &yaw) {
   static float dt = 0.01;
   static unsigned long lastTime = 0;
@@ -109,6 +103,11 @@ void IMU_update(float gx, float gy, float gz, float ax, float ay, float az, floa
   roll = alpha * roll + (1.0 - alpha) * accRoll;
   pitch = alpha * pitch + (1.0 - alpha) * accPitch;
 }
+
+float roll, pitch, yaw = 0;
+
+float ax, ay, az, gx, gy, gz;
+
 
 void get_pitch(float angle) {
   pid.set_point(angle);
@@ -179,9 +178,8 @@ void loop() {
   gx = mpu6050.getGyroX();
   gy = mpu6050.getGyroY();
   gz = mpu6050.getGyroZ();
-
-  IMU_update(gx, gy, gz, ax, ay, az, roll, pitch, yaw);
   
+  IMU_update(gx, gy, gz, ax, ay, az, roll, pitch, yaw);
   Serial.print("Roll: ");
   Serial.print(roll);
   Serial.print("Pitch: ");
@@ -205,7 +203,6 @@ void loop() {
   PWM(MOTOR_4_PIN, motor4_speed);
   */
 
-  get_pitch(35);
   /*
   MS5611.read();
   float height = calculateAltitude(MS5611.getPressure(), MS5611.getTemperature());
