@@ -10,8 +10,8 @@ int motor4_speed;
 
 int MOTOR_1_PIN = 23;
 int MOTOR_2_PIN = 22;
-int MOTOR_3_PIN = 21;
-int MOTOR_4_PIN = 18;
+int MOTOR_3_PIN = 17;
+int MOTOR_4_PIN = 16;
 
 int MPU_PIN_SDA = 21;
 int MPU_PIN_SCL = 19;
@@ -79,7 +79,7 @@ float calculateAltitude(float currentPressure, float currentTemperature) {
 void IMU_update(float gx, float gy, float gz, float ax, float ay, float az, float &roll, float &pitch, float &yaw) {
   static float dt = 0.01;
   static unsigned long lastTime = 0;
-  static float alpha = 0.78; // 互补滤波系数
+  static float alpha = 0.95; // 互补滤波系数
 
   unsigned long currentTime = millis();
   dt = (currentTime - lastTime) / 1000.0; // 转换为秒
@@ -108,8 +108,56 @@ float roll, pitch, yaw = 0;
 
 float ax, ay, az, gx, gy, gz;
 
+float q0 = 1, q1 = 0, q2 = 0, q3 = 0;
 
-void get_pitch(float angle) {
+const float Kp_IMU = 25;
+const float Ki_IMU = 0.0355;
+float exInt = 0, eyInt = 0, ezInt = 0;
+float norm;
+
+
+void IMU_update_quer(float gx, float gy, float gz, float ax, float ay, float az) {
+  float vx, vy, vz;
+  float ex, ey, ez;
+
+  norm = sqrt(ax*ax + ay*ay + az*az);
+  ax = ax / norm;
+  ay = ay / norm;
+  az = az / norm;
+
+  vx = 2 * (q1 * q3 - q0 * q2);
+  vy = 2* (q0 * q1 + q2 * q3);
+  vz = q0 * q0 - q1 * q1 - q2 * q2 + q3 * q3;
+
+  ex = (ay * vz - az * vy);
+  ey = (az * vx - ax * vz);
+  ez = (ax * vy - ay * vx);
+
+  exInt = exInt + ex * Ki_IMU;
+  eyInt = eyInt + ey * Ki_IMU;
+  ezInt = ezInt + ez * Ki_IMU;
+
+  gx = gx + Kp_IMU * ex + exInt;
+  gy = gy + Kp_IMU * ey + eyInt;
+  gz = gz + Kp_IMU * ez + ezInt;
+
+  q0 = q0 + 0.001 * (-q1 * gx - q2 * gy - q3 * gz);
+  q1 = q1 + 0.001 * (q0 * gx + q2 * gz - q3 * gy);
+  q2 = q2 + 0.001 * (q0 * gy - q1 * gz + q3 * gx);
+  q3 = q3 + 0.001 * (q0 * gz + q1 * gy - q2 * gx);
+
+  norm = sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+  q0 = q0 / norm;
+  q1 = q1 / norm;
+  q2 = q2 / norm;
+  q3 = q3 / norm;
+
+  pitch = sin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
+  roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;
+}
+
+
+void get_roll(float angle) {
   pid.set_point(angle);
   double control_signal = pid.PIDAlgorithm(pitch);
   Serial.print("Control_Signal: ");
@@ -121,17 +169,16 @@ void get_pitch(float angle) {
   motor3_speed = base_speed + control_signal;
   motor4_speed = base_speed - control_signal;
 
-  motor1_speed = constrain(motor1_speed, 0, 1000);
-  motor2_speed = constrain(motor1_speed, 0, 1000);
-  motor3_speed = constrain(motor1_speed, 0, 1000);
-  motor4_speed = constrain(motor1_speed, 0, 1000);
+  motor1_speed = constrain(motor1_speed, 0, 400);
+  motor2_speed = constrain(motor1_speed, 0, 400);
+  motor3_speed = constrain(motor1_speed, 0, 400);
+  motor4_speed = constrain(motor1_speed, 0, 400);
 
   PWM(MOTOR_1_PIN, motor1_speed);
   PWM(MOTOR_2_PIN, motor2_speed);
   PWM(MOTOR_3_PIN, motor3_speed);
   PWM(MOTOR_4_PIN, motor4_speed);
   
-
 }
 
 
@@ -157,7 +204,6 @@ void setup() {
   int motorPins[] = {MOTOR_1_PIN, MOTOR_2_PIN, MOTOR_3_PIN, MOTOR_4_PIN};
   MOTOR_INIT(motorPins, 4);
 
-
   
 
 
@@ -179,19 +225,19 @@ void loop() {
   gy = mpu6050.getGyroY();
   gz = mpu6050.getGyroZ();
   
-  IMU_update(gx, gy, gz, ax, ay, az, roll, pitch, yaw);
-  Serial.print("Roll: ");
+  IMU_update_quer(gx, gy, gz, ax, ay, az);
   Serial.print(roll);
-  Serial.print("Pitch: ");
+  Serial.print(",");
   Serial.print(pitch);
-  Serial.print("Yaw: ");
+  Serial.print(",");
   Serial.println(yaw);
 
+  //get_roll(0);
 
+  /*
   // 给他一个转速
   speed = 100;
 
-  /*
   motor1_speed = speed;
   motor2_speed = speed;
   motor3_speed = speed;
