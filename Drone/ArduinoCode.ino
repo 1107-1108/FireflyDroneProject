@@ -19,6 +19,7 @@ int MPU_PIN_SCL = 19;
 //MS5611 MS5611(0x77);
 MPU6050 mpu6050(Wire);
 
+
 class PID {
 public:
   PID(double P, double I, double D)
@@ -44,7 +45,8 @@ private:
   double set_val;
 };
 
-PID pid(1.0, 0.1, 0.01);
+PID pid(2.0, 0.1, 0.01);
+
 
 void PWM(int PWMPin, int PWMValue){  // 模拟PWM；频率100Hz
   PWMValue += 1000;
@@ -76,33 +78,7 @@ float calculateAltitude(float currentPressure, float currentTemperature) {
   return height;
 }
 
-void IMU_update(float gx, float gy, float gz, float ax, float ay, float az, float &roll, float &pitch, float &yaw) {
-  static float dt = 0.01;
-  static unsigned long lastTime = 0;
-  static float alpha = 0.95; // 互补滤波系数
 
-  unsigned long currentTime = millis();
-  dt = (currentTime - lastTime) / 1000.0; // 转换为秒
-  lastTime = currentTime;
-
-  // 加速度计计算roll和pitch
-  float accRoll = atan2(ay, az) * 180.0 / PI;
-  float accPitch = atan2(-ax, sqrt(ay * ay + az * az)) * 180.0 / PI;
-
-  // 陀螺仪计算角度增量
-  float gyroRollRate = gx;
-  float gyroPitchRate = gy;
-  float gyroYawRate = gz;
-
-  // 积分得到角度
-  roll += gyroRollRate * dt;
-  pitch += gyroPitchRate * dt;
-  yaw += gyroYawRate * dt;
-
-  // 互补滤波融合
-  roll = alpha * roll + (1.0 - alpha) * accRoll;
-  pitch = alpha * pitch + (1.0 - alpha) * accPitch;
-}
 
 float roll, pitch, yaw = 0;
 
@@ -110,10 +86,16 @@ float ax, ay, az, gx, gy, gz;
 
 float q0 = 1, q1 = 0, q2 = 0, q3 = 0;
 
-const float Kp_IMU = 25;
+const float Kp_IMU = 26;
 const float Ki_IMU = 0.0355;
 float exInt = 0, eyInt = 0, ezInt = 0;
 float norm;
+
+const int SAMPLE_SIZE = 20;
+int sampleIndex = 0;
+float rollBuffer[SAMPLE_SIZE] = {0.0};
+float pitchBuffer[SAMPLE_SIZE] = {0.0};
+float current_roll, current_pitch;
 
 
 void IMU_update_quer(float gx, float gy, float gz, float ax, float ay, float az) {
@@ -152,8 +134,25 @@ void IMU_update_quer(float gx, float gy, float gz, float ax, float ay, float az)
   q2 = q2 / norm;
   q3 = q3 / norm;
 
-  pitch = sin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
-  roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;
+  current_pitch = sin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
+  current_roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;
+
+  rollBuffer[sampleIndex] = current_roll;
+  pitchBuffer[sampleIndex] = current_pitch;
+
+  sampleIndex = (sampleIndex + 1) % SAMPLE_SIZE;
+
+  if (sampleIndex == 0) {
+    float rollSum = 0.0;
+    float pitchSum = 0.0;
+    for (int i = 0 ; i < SAMPLE_SIZE; ++i) {
+      rollSum += rollBuffer[i];
+      pitchSum += pitchBuffer[i];
+    }
+
+    roll = rollSum / SAMPLE_SIZE;
+    pitch = pitchSum / SAMPLE_SIZE;
+  }
 }
 
 
@@ -163,16 +162,16 @@ void get_roll(float angle) {
   Serial.print("Control_Signal: ");
   Serial.println(control_signal);
 
-  int base_speed = 200;
+  int base_speed = 150;
   motor1_speed = base_speed + control_signal;
   motor2_speed = base_speed - control_signal;
   motor3_speed = base_speed + control_signal;
   motor4_speed = base_speed - control_signal;
 
-  motor1_speed = constrain(motor1_speed, 0, 400);
-  motor2_speed = constrain(motor1_speed, 0, 400);
-  motor3_speed = constrain(motor1_speed, 0, 400);
-  motor4_speed = constrain(motor1_speed, 0, 400);
+  motor1_speed = constrain(motor1_speed, 0, 300);
+  motor2_speed = constrain(motor1_speed, 0, 300);
+  motor3_speed = constrain(motor1_speed, 0, 300);
+  motor4_speed = constrain(motor1_speed, 0, 300);
 
   PWM(MOTOR_1_PIN, motor1_speed);
   PWM(MOTOR_2_PIN, motor2_speed);
@@ -181,7 +180,42 @@ void get_roll(float angle) {
   
 }
 
+PID pid_roll(2.0, 0.1, 0.01);
+PID pid_pitch(2.0, 0.1, 0.01);
+PID pid_yaw(2.0, 0.1, 0.01);
 
+
+void update_motor_speeds(float exp_roll, float exp_pitch, float exp_yaw) {
+
+  mpu6050.update();
+  ax = mpu6050.getAccX();
+  ay = mpu6050.getAccY();
+  az = mpu6050.getAccZ();
+  gx = mpu6050.getGyroX();
+  gy = mpu6050.getGyroY();
+  gz = mpu6050.getGyroZ();
+  IMU_update_quer(gx, gy, gz, ax, ay, az);
+
+  pid_roll.set_point(exp_roll);
+  pid_pitch.set_point(exp_roll);
+  pid_yaw.set_point(exp_yaw);
+
+  double roll_control_signal = pid_roll.PIDAlgorithm(roll);
+  double pitch_control_signal = pid_pitch.PIDAlgorithm(pitch);
+  double yaw_control_signal = pid_yaw.PIDAlgorithm(yaw);
+
+  int base_speed = 150;
+  motor1_speed = base_speed + roll_control_signal + pitch_control_signal - yaw_control_signal;
+  motor2_speed = base_speed - roll_control_signal + pitch_control_signal + yaw_control_signal;
+  motor3_speed = base_speed + roll_control_signal - pitch_control_signal + yaw_control_signal;
+  motor4_speed = base_speed - roll_control_signal - pitch_control_signal - yaw_control_signal;
+
+  PWM(MOTOR_1_PIN, motor1_speed);
+  PWM(MOTOR_2_PIN, motor2_speed);
+  PWM(MOTOR_3_PIN, motor3_speed);
+  PWM(MOTOR_4_PIN, motor4_speed);
+
+}
   
 
 void setup() {
@@ -202,7 +236,7 @@ void setup() {
 
 
   int motorPins[] = {MOTOR_1_PIN, MOTOR_2_PIN, MOTOR_3_PIN, MOTOR_4_PIN};
-  MOTOR_INIT(motorPins, 4);
+  //MOTOR_INIT(motorPins, 4);
 
   
 
@@ -216,6 +250,8 @@ void setup() {
 }
 
 void loop() {
+  update_motor_speeds(0,0,0);
+
   mpu6050.update();
   //mpu6050读数
   ax = mpu6050.getAccX();
@@ -226,6 +262,7 @@ void loop() {
   gz = mpu6050.getGyroZ();
   
   IMU_update_quer(gx, gy, gz, ax, ay, az);
+
   Serial.print(roll);
   Serial.print(",");
   Serial.print(pitch);
@@ -233,9 +270,9 @@ void loop() {
   Serial.println(yaw);
 
   //get_roll(0);
+  
 
   /*
-  // 给他一个转速
   speed = 100;
 
   motor1_speed = speed;
@@ -253,4 +290,5 @@ void loop() {
   MS5611.read();
   float height = calculateAltitude(MS5611.getPressure(), MS5611.getTemperature());
   */
+  delay(30); //控制更新频率
 }

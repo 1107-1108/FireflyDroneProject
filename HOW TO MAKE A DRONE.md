@@ -4,7 +4,25 @@
 
 这也算是份学习记录吧。
 
+请注意安全！
+
 建议Typora食用，查看LaTeX公式效果更佳
+
+有问题，但是不知道如何表达？看看这个! [智者提问手册](https://github.com/1107-1108/smartquestions/blob/master/智者提问手册.md)
+
+## 免责声明
+
+本教程（教宁如何搓无人机）（HOW TO MAKE A DRONE)提供的所有内容仅供学习、交流和分享用途，只供参考。阅读者可将本教程提供的内容用于个人学习，研究或欣赏，以及其他非商业性或营利性用途，但同时应遵守开源协议，不得侵犯本教程作者及相关权利人的合法权利。
+
+本教程并不保证所有内容的完整性，准确性和及时性。
+
+本教程内有为浏览者提供方便的第三方链接出现，链接内容并不代表本教程观点，若点击即可能将离开本教程进入第三方站点，本教程不为第三方站点带来的任何风险负责。
+
+本教程内部分操作存在操作安全隐患，无论是否有不当操作造成的伤亡，本教程及其作者概不负责。请谨慎操作。
+
+一经开始阅读，即表示您已经接受上述声明，需自行承担一切风险。
+
+以上声明内容最终解释权在法律允许内归本教程及其作者所有。
 
 ## 贡献者
 
@@ -24,6 +42,10 @@
 无人机的测试以及飞行一定需要遵循当地法律！！！
 
 请仔细阅读法律条例
+
+如果你要带无人机电池上飞机请提前咨询航空公司，因为会有限制。
+
+### 0.1 中华人民共和国相关法律
 
 [中华人民共和国无人驾驶航空器飞行管理暂行条例](https://www.gov.cn/zhengce/content/202306/content_6888799.htm)
 
@@ -46,6 +68,26 @@
 > 操控微型、轻型民用无人驾驶航空器飞行的人员，无需取得操控员执照，但应当熟练掌握有关机型操作方法，了解风险警示信息和有关管理制度。
 
 所以，在**适飞区**里飞我的无人机，首先需要在(UOM)[https://uom.caac.gov.cn/]里实名注册我的无人机，并且将实名登记标志黏贴到无人机上，然后需要个爹看着我飞。
+
+### 0.2 大不列颠及北爱尔兰联合王国
+
+[Introduction to drone flying and the UK rules | Civil Aviation Authority (caa.co.uk)](https://www.caa.co.uk/drones/rules-and-categories-of-drone-flying/introduction-to-drone-flying-and-the-uk-rules/)
+
+根据英国法律，首先你需要遵循一下
+
+> Key rules include:
+>
+> - Never fly more than 120m (400ft) above the surface
+> - Always keep your drone or model aircraft in sight
+> - Never fly in an airport’s flight restriction zone unless you have permission
+
+**根据我的理解**，我的无人机重量肯定大于250克，所以我需要注册Operator ID和Flyer ID， 注册Operator ID的费用是11磅，并且需要通过在线理论考试（好像是开卷考所以不会很难）。
+
+### 0.3 其他国家
+
+请自行上网查找当地法律资料。
+
+可以参考一下[全球各地区飞行安全法规合集（持续更新） (dji.com)](https://support.dji.com/help/content?customId=zh-cn03400009861&spaceId=34&re=CN&lang=zh-CN)
 
 ## 材料准备
 
@@ -614,6 +656,28 @@ $$
 pitch = sin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
 roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;
 ```
+
+
+
+### 3.3 PID
+
+PID是Proportion, integration, derivative。Proportion是对当前时刻的误差进行比例放大，Integration是对过去所有时间的偏差进行积分，Derivative是通过对偏差的微分，对控制系统的输出走向进行预判，起到超前调节的作用。
+
+因为作者理解能力与时间有限，故第一个版本使用三个单级PID来控制。
+
+#### Proportion
+
+作用: 比例是对当前时刻的误差进行比例放大
+
+假设系统在某个时刻从传感器获得的值为 $X_n $ (E.g. $X_1, X_2, X_3 ... X_n$ )
+
+那么第$\alpha$时刻的误差就是$error(\alpha) = Exp(\alpha) - X_\alpha$
+
+p环节的输出就是$u(\alpha) = Kp * error(\alpha)$
+
+其中Kp是Proportion比例系数，就是放大倍数
+
+#### Integration
 
 
 
