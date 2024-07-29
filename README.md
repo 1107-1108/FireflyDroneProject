@@ -16,3 +16,35 @@
 
 TyxC127大跌     建模
 
+贡献者:
+
+Li3_Fish: 教程审核
+
+父母&外公外婆: 钱
+
+
+
+
+
+🛠️ Developing...
+
+Any ideas or suggestions please contact [1107@siwg.top](mailto:1107@siwg.top)
+
+Thanks for the help from TyxC127, tyism1r3hk and Li3_Fish.
+
+Also appreciate for red packet(Money) from all the relatives!
+
+Developers:
+
+1107(Whole system of the drone, PCB design, hardware assemble, including drone's structure and SMT)
+
+TyxC127: Modeling outer shell of the flight control for protection
+
+Contributors:
+
+Li3_Fish: Double-check of the document
+
+Grandparents&parents: Money support
+
+
+
