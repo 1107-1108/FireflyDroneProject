@@ -1,11 +1,12 @@
 #include <XboxSeriesXControllerESP32_asukiaaa.hpp>
 
-
 // Required to replace with your xbox address
 // XboxSeriesXControllerESP32_asukiaaa::Core
 // xboxController("44:16:22:5e:b2:d4");
 
-XboxSeriesXControllerESP32_asukiaaa::Core xboxController("68:6c:e6:91:2b:bc");
+XboxSeriesXControllerESP32_asukiaaa::Core xboxController;
+
+
 
 enum control_signal {
   PITCH,
@@ -22,19 +23,58 @@ struct DATA_PACKET {
 };
 
 float control_2_angle(int origin) {
-  return origin / 1456.33;
+  return (origin / 728.167) - 45;
 }
 
 
+
+String comdata = ""; 
+long previousMillis = millis();     //上一次激活时间
+long interval = 100; 
+
 DATA_PACKET *dat = new DATA_PACKET();
 
+
+
+
+
+
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
+  Serial2.begin(9600,SERIAL_8N1,35, 32);
   Serial.println("Starting Firefly Drone Project Controlling Center");
   xboxController.begin();
 }
 
+void send_data(const String& message) {
+  Serial2.print(message);
+}
+
+void Receive_Data() {
+  char endChar = '\n';
+  String comdata = "";
+
+  while (Serial2.available() > 0) {
+    char incomingChar = char(Serial2.read());
+
+    if (incomingChar == endChar) { 
+      break;
+    }
+
+    comdata += incomingChar;
+    delay(2);
+  }
+  comdata.trim();
+  if (comdata.length() > 0) {
+    Serial.print("Received comdata: ");
+    Serial.println(comdata);
+  }
+
+}
+
+
 void loop() {
+
   xboxController.onLoop();
   if (xboxController.isConnected()) {
     if (xboxController.isWaitingForFirstNotification()) {
@@ -49,6 +89,7 @@ void loop() {
       dat->right_horizon = control_2_angle(xboxController.xboxNotif.joyRHori);
       dat->right_vertical = control_2_angle(xboxController.xboxNotif.joyRVert);
       
+      /*
       Serial.print(dat->left_horizon);
       Serial.print(',');
       Serial.print(dat->left_vertical);
@@ -56,11 +97,42 @@ void loop() {
       Serial.print(dat->right_horizon);
       Serial.print(',');
       Serial.println(dat->right_vertical);
+      */
 
       // Serial.println("received at " + String(receivedAt));
     }
   } else {
     Serial.println("not connected");
+    if (xboxController.getCountFailedConnection() > 2) {
+      ESP.restart();
+    }
   }
-  delay(100);
+
+  
+  if (Serial2.available()) {
+    Receive_Data();
+  }
+
+  if (millis() - previousMillis > interval) {
+    String message = "Joystick: ";
+    message += String(dat->left_horizon) + ",";
+    message += String(dat->left_vertical) + ",";
+    message += String(dat->right_horizon) + ",";
+    message += String(dat->right_vertical);
+
+    send_data(message);
+    previousMillis = millis();
+  }
+
+  /*
+  // Read from Serial (for testing input)
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');
+    Serial.print("Sending: ");
+    Serial.println(input);
+    send_data(input);
+  }
+  */
+  
+  delay(30);
 }

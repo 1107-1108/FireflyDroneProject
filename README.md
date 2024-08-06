@@ -22,7 +22,7 @@ Li3_Fish: 教程审核
 
 父母&外公外婆: 钱
 
-
+流萤: 精神支持
 
 
 
@@ -45,6 +45,8 @@ Contributors:
 Li3_Fish: Double-check of the document
 
 Grandparents&parents: Money support
+
+Firefly: emotional support
 
 
 
