@@ -22,7 +22,7 @@ int GY_PIN_SCL = 26;
 MS5611 MS5611(0x77);
 MPU6050 mpu6050(Wire1);
 
-String comdata = ""; 
+char comdata[50];
 long previousMillis = millis();     //上一次激活时间
 long interval = 300; 
 
@@ -87,7 +87,8 @@ float calculateAltitude(float currentPressure, float currentTemperature) {
 
 
 
-float roll, pitch, yaw = 0;
+float roll = 0, pitch = 0, yaw = 0;
+
 
 float ax, ay, az, gx, gy, gz;
 
@@ -103,7 +104,8 @@ int sampleIndex = 0;
 float rollBuffer[SAMPLE_SIZE] = {0.0};
 float pitchBuffer[SAMPLE_SIZE] = {0.0};
 float current_roll, current_pitch;
-int exp_roll, exp_pitch;
+int exp_roll, exp_pitch, exp_yaw;
+float exp_altitude;
 int up_num, down_num;
 
 void IMU_update_quer(float gx, float gy, float gz, float ax, float ay, float az) {
@@ -167,8 +169,10 @@ PID pid_roll(2.0, 0.1, 0.01);
 PID pid_pitch(2.0, 0.1, 0.01);
 PID pid_yaw(2.0, 0.1, 0.01);
 PID pid_altitude(2.0, 0.1, 0.01);
-float current_altitude = 0.0;
+
+float current_altitude;
 float target_altitude = 0.0;
+
 
 
 void update_motor_speeds(float exp_roll, float exp_pitch, float exp_yaw, float exp_altitude) {
@@ -186,9 +190,10 @@ void update_motor_speeds(float exp_roll, float exp_pitch, float exp_yaw, float e
   current_altitude = calculateAltitude(MS5611.getPressure(), MS5611.getTemperature());
 
   pid_roll.set_point(exp_roll);
-  pid_pitch.set_point(exp_roll);
+  pid_pitch.set_point(exp_pitch);
   pid_yaw.set_point(exp_yaw);
-  pid_altitude.set_point(exp_altitude);
+  pid_altitude.set_point(exp_altitude / 90 + current_altitude);
+
 
   double roll_control_signal = pid_roll.PIDAlgorithm(roll);
   double pitch_control_signal = pid_pitch.PIDAlgorithm(pitch);
@@ -201,12 +206,37 @@ void update_motor_speeds(float exp_roll, float exp_pitch, float exp_yaw, float e
   motor3_speed = base_speed + roll_control_signal - pitch_control_signal + yaw_control_signal + altitude_control_signal;
   motor4_speed = base_speed - roll_control_signal - pitch_control_signal - yaw_control_signal + altitude_control_signal;
 
+  motor1_speed = constrain(motor1_speed, 0, 1000);
+  motor2_speed = constrain(motor2_speed, 0, 1000);
+  motor3_speed = constrain(motor3_speed, 0, 1000);
+  motor4_speed = constrain(motor4_speed, 0, 1000);
+
   PWM(MOTOR_1_PIN, motor1_speed);
   PWM(MOTOR_2_PIN, motor2_speed);
   PWM(MOTOR_3_PIN, motor3_speed);
   PWM(MOTOR_4_PIN, motor4_speed);
 
 }
+
+void processData(String comdata, int &exp_pitch, int &exp_roll, int &exp_yaw, int &other) {
+  if (comdata.startsWith("Joystick:")) {
+    int colonIndex = comdata.indexOf(':');
+    if (colonIndex != -1) {
+      String numbersPart = comdata.substring(colonIndex + 1);
+      numbersPart.trim();
+
+      int firstComma = numbersPart.indexOf(',');
+      int secondComma = numbersPart.indexOf(',', firstComma + 1);
+      int thirdComma = numbersPart.indexOf(',', secondComma + 1);
+
+      exp_pitch = numbersPart.substring(0, firstComma).toInt(); // pitch
+      exp_roll = numbersPart.substring(firstComma + 1, secondComma).toInt(); // roll
+      exp_yaw = numbersPart.substring(secondComma + 1, thirdComma).toInt(); // yaw
+      exp_altitude = numbersPart.substring(thirdComma + 1).toFloat(); // altitude
+    }
+  }
+}
+
   
 
 void setup() {
@@ -231,105 +261,75 @@ void setup() {
   int motorPins[] = {MOTOR_1_PIN, MOTOR_2_PIN, MOTOR_3_PIN, MOTOR_4_PIN};
   MOTOR_INIT(motorPins, 4);
   MS5611.begin();
+  exp_altitude = calculateAltitude(MS5611.getPressure(), MS5611.getTemperature());
 }
 
 void send_data(String msg) {
   Serial2.print(msg);
 }
 
+
 void Receive_Data() {
   char endChar = '\n';
-  String comdata = "";
+  int index = 0;
 
-  while (Serial2.available() > 0) {
+  while (Serial2.available() > 0 && index < sizeof(comdata) - 1) {
     char incomingChar = char(Serial2.read());
 
-    if (incomingChar == endChar) { 
+    if (incomingChar == endChar) {
       break;
     }
 
-    comdata += incomingChar;
+    comdata[index++] = incomingChar;
     delay(2);
   }
-  comdata.trim();
-  if (comdata.length() > 0) {
+  comdata[index] = '\0';
+
+  if (index > 0) {
     Serial.print("Received comdata: ");
+    Serial.print(comdata);
     processData(comdata, exp_pitch, exp_roll, up_num, down_num);
   }
 }
 
-void processData(String comdata, int &num1, int &num2, int &num3, int &num4) {
-  if (comdata.startsWith("Joystick:")) {
-    int colonIndex = comdata.indexOf(':');
-    if (colonIndex != -1) {
-      String numbersPart = comdata.substring(colonIndex + 1);
-      numbersPart.trim();
 
-      int firstComma = numbersPart.indexOf(',');
-      int secondComma = numbersPart.indexOf(',', firstComma + 1);
-      int thirdComma = numbersPart.indexOf(',', secondComma + 1);
-
-      int num1 = numbersPart.substring(0, firstComma).toInt(); //pitch
-      int num2 = numbersPart.substring(firstComma + 1, secondComma).toInt(); //raw
-      int num3 = numbersPart.substring(secondComma + 1, thirdComma).toInt();
-      int num4 = numbersPart.substring(thirdComma + 1).toInt();
-    }
-  }
-}
-
-
+const unsigned long updateInterval = 30;
+unsigned long previousUpdateTime = 0;
 
 void loop() {
-  if (Serial2.available()) {
-    Receive_Data();
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousUpdateTime >= updateInterval) {
+    previousUpdateTime = currentMillis;
+
+    if (Serial2.available()) {
+      Receive_Data();
+    }
+
+
+    update_motor_speeds(exp_roll, exp_pitch, exp_yaw, exp_altitude);
+
+    mpu6050.update();
+    ax = mpu6050.getAccX();
+    ay = mpu6050.getAccY();
+    az = mpu6050.getAccZ();
+    gx = mpu6050.getGyroX();
+    gy = mpu6050.getGyroY();
+    gz = mpu6050.getGyroZ();
+
+    MS5611.read();
+    float height = calculateAltitude(MS5611.getPressure(), MS5611.getTemperature());
+    Serial.println(height);
+
+    IMU_update_quer(gx, gy, gz, ax, ay, az);
+
+    Serial.print("exp_pitch");
+    Serial.print(exp_pitch);
+    Serial.print("exp_roll");
+    Serial.print(exp_roll);
+    Serial.print("exp_altitude");
+    Serial.print(exp_altitude);
+    Serial.print("exp_yaw");
+    Serial.println(exp_yaw);
   }
-
-  // 从摇杆或其他输入设置目标高度（单位：米）
-  target_altitude = 10.0;
-  update_motor_speeds(exp_roll, exp_pitch, exp_yaw, target_altitude);
-
-  mpu6050.update();
-  //mpu6050读数
-  ax = mpu6050.getAccX();
-  ay = mpu6050.getAccY();
-  az = mpu6050.getAccZ();
-  gx = mpu6050.getGyroX();
-  gy = mpu6050.getGyroY();
-  gz = mpu6050.getGyroZ();
-  
-  IMU_update_quer(gx, gy, gz, ax, ay, az);
-
-  if (millis() - previousMillis > interval) {
-    String message = "Attitude: ";
-    message += String(current_roll) + ",";
-    message += String(current_pitch);
-
-    send_data(message);
-    previousMillis = millis();
-  }
-
-
-  Serial.print(roll);
-  Serial.print(",");
-  Serial.print(pitch);
-  Serial.print(",");
-  Serial.println(yaw);
-
-
-  speed = 100;
-  motor1_speed = speed;
-  motor2_speed = speed;
-  motor3_speed = speed;
-  motor4_speed = speed;
-
-  PWM(MOTOR_1_PIN, motor1_speed);
-  PWM(MOTOR_2_PIN, motor2_speed);
-  PWM(MOTOR_3_PIN, motor3_speed);
-  PWM(MOTOR_4_PIN, motor4_speed);
-
-
-  MS5611.read();
-  float height = calculateAltitude(MS5611.getPressure(), MS5611.getTemperature());
-  Serial.println(height);
-  delay(30); //控制更新频率
 }
