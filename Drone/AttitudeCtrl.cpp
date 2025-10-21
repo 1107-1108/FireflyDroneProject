@@ -1,6 +1,6 @@
 #include "quaternion.h"
 #include "KalmanFilter.h"
-
+#include "AttitudeCtrl.h"
 
 void quatGyroUpdate(Quaternion *q, double gx, double gy, double gz, double dt) {
     Quaternion q_gyro = {0, gx, gy, gz};
