@@ -2,6 +2,9 @@
 #define ATTITUDECRTL_H
 
 #include "quaternion.h"
+#include "KalmanFilter.h"
+#include "AttitudeCtrl.h"
+#include <math.h>
 
 void quatGyroUpdate(Quaternion *q, double gx, double gy, double gz, double dt);
 Quaternion bodyToEarth(Quaternion q, Quaternion v_b);
