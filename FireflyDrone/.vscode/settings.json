@@ -18,7 +18,11 @@
   ],
   "files.associations": {
     "i2c.h": "c",
-    "task.h": "c"
+    "task.h": "c",
+    "stdio.h": "c",
+    "fireflydrone_main.h": "c",
+    "sdkconfig.h": "c",
+    "i2c_master.h": "c"
   },
   "idf.flashType": "UART"
 }

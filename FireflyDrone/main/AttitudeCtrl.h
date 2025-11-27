@@ -5,10 +5,12 @@
 #include "KalmanFilter.h"
 #include "AttitudeCtrl.h"
 #include <math.h>
+#include "mpu6050.h"
 
 void quatGyroUpdate(Quaternion *q, double gx, double gy, double gz, double dt);
 Quaternion bodyToEarth(Quaternion q, Quaternion v_b);
 double getAltitude(double pressure, double temperature);
-void MEKF_filter(double dt, const double Q[3][3], const double R[3][3]);
+void MEKF_filter(double dt, const double Q[3][3], const double R[3][3], mpu6050_raw_dat *raw);
+void quatToEulerFloat(Quaternion q, float *roll, float *pitch, float *yaw);
 
 #endif

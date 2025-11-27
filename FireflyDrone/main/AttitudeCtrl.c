@@ -2,6 +2,7 @@
 #include "KalmanFilter.h"
 #include "AttitudeCtrl.h"
 #include <math.h>
+#include "mpu6050.h"
 
 #define PI 3.1415926535897932384
 
@@ -14,22 +15,27 @@ void quatGyroUpdate(Quaternion *q, double gx, double gy, double gz, double dt) {
     q_tnext.y *= 0.5;
     q_tnext.z *= 0.5;
 
-    q_gyro.w += q_tnext.w * dt;
-    q_gyro.x += q_tnext.x * dt;
-    q_gyro.y += q_tnext.y * dt;
-    q_gyro.z += q_tnext.z * dt;
+    q->w += q_tnext.w * dt;
+    q->x += q_tnext.x * dt;
+    q->y += q_tnext.y * dt;
+    q->z += q_tnext.z * dt;
     //归一
     quatNormalize(q);
 }
 
-void MEKF_filter(double dt, const double Q[3][3], const double R[3][3]) {
+void MEKF_filter(double dt, const double Q[3][3], const double R[3][3], mpu6050_raw_dat *raw) {
     MEKF filter;
     mekf_init(&filter);
     int ax_raw, ay_raw, az_raw;
     int gx_raw, gy_raw, gz_raw;
     double v_I[3] = {0, 0, 1};
     // read the data function
-    // mpu6050_r(&ax_raw, &ay_raw, &az_raw, &gx_raw, &gy_raw, &gz_raw);
+    ax_raw = raw -> ax;
+    ay_raw = raw -> ay;
+    az_raw = raw -> az;
+    gx_raw = raw -> gx;
+    gy_raw = raw -> gy;
+    gz_raw = raw -> gz;
     double omega[3] = {
         // TODO
         // Angle Transfer
@@ -70,4 +76,20 @@ double getAltitude(double pressure, double temperature) {
     double ratio = pressure / 101325.0;
     double altitude = (temp_K / 0.0065) * (1 - pow(ratio, (287.05 * 0.0065 / 9.80665)));
     return altitude;
+}
+
+void quatToEulerFloat(Quaternion q, float *roll, float *pitch, float *yaw) {
+    double sinr_cosp = 2.0 * (q.w * q.x + q.y * q.z);
+    double cosr_cosp = 1.0 - 2.0 * (q.x * q.x + q.y * q.y);
+    *roll = (float)(atan2(sinr_cosp, cosr_cosp) * (180.0 / M_PI));
+
+    double sinp = 2.0 * (q.w * q.y - q.z * q.x);
+    if (fabs(sinp) >= 1)
+        *pitch = (float)copysign(90.0, sinp);
+    else
+        *pitch = (float)(asin(sinp) * (180.0 / M_PI));
+
+    double siny_cosp = 2.0 * (q.w * q.z + q.x * q.y);
+    double cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z);
+    *yaw = (float)(atan2(siny_cosp, cosy_cosp) * (180.0 / M_PI));
 }
