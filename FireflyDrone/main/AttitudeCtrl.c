@@ -6,6 +6,9 @@
 
 #define PI 3.1415926535897932384
 
+static MEKF filter;
+static bool filter_initialized = false;
+
 void quatGyroUpdate(Quaternion *q, double gx, double gy, double gz, double dt) {
     Quaternion q_gyro = {0, gx, gy, gz};
     //运算
@@ -23,9 +26,12 @@ void quatGyroUpdate(Quaternion *q, double gx, double gy, double gz, double dt) {
     quatNormalize(q);
 }
 
-void MEKF_filter(double dt, const double Q[3][3], const double R[3][3], mpu6050_raw_dat *raw) {
-    MEKF filter;
-    mekf_init(&filter);
+void MEKF_filter(double dt, const double Q[3][3], const double R[3][3], mpu6050_raw_dat *raw, double *roll, double *pitch, double *yaw) {
+    if (!filter_initialized) {
+        mekf_init(&filter);
+        filter_initialized = true;
+    }
+    
     int ax_raw, ay_raw, az_raw;
     int gx_raw, gy_raw, gz_raw;
     double v_I[3] = {0, 0, 1};
@@ -37,27 +43,29 @@ void MEKF_filter(double dt, const double Q[3][3], const double R[3][3], mpu6050_
     gy_raw = raw -> gy;
     gz_raw = raw -> gz;
     double omega[3] = {
-        // TODO
-        // Angle Transfer
-        // Well idk how to do it so its not my work lmao
-        // QwQ......
+        (gx_raw / GYRO_SENS) * (M_PI / 180.0),
+        (gy_raw / GYRO_SENS) * (M_PI / 180.0),
+        (gz_raw / GYRO_SENS) * (M_PI / 180.0)
     };
     double accel[3] = {
-        // TODO
-        // Dont know how to do as well
-        // QAQ.......
+        ax_raw / ACCEL_SENS,
+        ay_raw / ACCEL_SENS,
+        az_raw / ACCEL_SENS
     };
     mekf_predict(&filter, omega, dt, Q);
     double acc_norm = sqrt(accel[0]*accel[0] + accel[1]*accel[1] + accel[2]*accel[2]);
     double z[3] = { accel[0]/acc_norm, accel[1]/acc_norm, accel[2]/acc_norm };
     mekf_update(&filter, z, v_I, R);
 
-    double roll, pitch, yaw;
     // Unit in rads
     // I think the formula I typed in is correct
-    roll = atan2(2 * (filter.q.x * filter.q.w + filter.q.y * filter.q.z), 1 - 2 * (filter.q.x * filter.q.x + filter.q.y * filter.q.y));
-    pitch = - PI / 2 + 2 * atan2(sqrt(1 + 2 * (filter.q.w * filter.q.y - filter.q.x * filter.q.z)), sqrt(1 - 2 * (filter.q.w * filter.q.y - filter.q.x * filter.q.z)));
-    yaw = atan2(2 * (filter.q.w * filter.q.z + filter.q.x * filter.q.y), 1 - 2 * (filter.q.y * filter.q.y + filter.q.z * filter.q.z));
+    *roll = atan2(2 * (filter.q.x * filter.q.w + filter.q.y * filter.q.z), 1 - 2 * (filter.q.x * filter.q.x + filter.q.y * filter.q.y));
+    *pitch = - PI / 2 + 2 * atan2(sqrt(1 + 2 * (filter.q.w * filter.q.y - filter.q.x * filter.q.z)), sqrt(1 - 2 * (filter.q.w * filter.q.y - filter.q.x * filter.q.z)));
+    *yaw = atan2(2 * (filter.q.w * filter.q.z + filter.q.x * filter.q.y), 1 - 2 * (filter.q.y * filter.q.y + filter.q.z * filter.q.z));
+    
+    *roll  *= 180.0 / M_PI;
+    *pitch *= 180.0 / M_PI;
+    *yaw   *= 180.0 / M_PI;
 
 }
 

@@ -100,94 +100,133 @@ void mekf_predict(MEKF *model, const double omega[3], double dt, const double Q[
     }
 }
 
-void update(MEKF *model, const double z[3], const double v_I[3], const double R[3][3]) {
-    // Rotation Matrix
-    double qx, qy, qz, qw;
-    qx = model->q.x;
-    qy = model->q.y;
-    qz = model->q.z;
-    qw = model->q.w;
+void mekf_update(MEKF *model, const double z[3], const double v_I[3], const double R[3][3]) {
+    // Rotation Matrix from quaternion
+    double qx = model->q.x;
+    double qy = model->q.y;
+    double qz = model->q.z;
+    double qw = model->q.w;
+
     double A[3][3] = {
-        {1 - 2*(qy*qy + qz*qz), 2*(qx*qy - qz*qw), 2*(qx*qz + qy*qw)},
-        {2*(qx*qy + qz*qw), 1-  2*(qx*qx + qz*qz), 2*(qy*qz - qx*qw)},
-        {2*(qx*qz - qy*qw), 2*(qy*qz + qx*qw), 1 - 2*(qx*qx + qy*qy)}
-    };  // quat to roration matrix
+        {1 - 2*(qy*qy + qz*qz),  2*(qx*qy - qz*qw),      2*(qx*qz + qy*qw)},
+        {2*(qx*qy + qz*qw),      1 - 2*(qx*qx + qz*qz),  2*(qy*qz - qx*qw)},
+        {2*(qx*qz - qy*qw),      2*(qy*qz + qx*qw),      1 - 2*(qx*qx + qy*qy)}
+    };
 
-    //Predict Measurement
-    // V_B = A(q_ref) * V_I
+    // Predict measurement vB = A * v_I
     double vB[3];
-    vB[0] = A[0][0]*v_I[0] + A[0][1]*v_I[1] + A[0][2]*v_I[2];
-    vB[1] = A[1][0]*v_I[0] + A[1][1]*v_I[1] + A[1][2]*v_I[2];
-    vB[2] = A[2][0]*v_I[0] + A[2][1]*v_I[1] + A[2][2]*v_I[2];
+    for (int i = 0; i < 3; ++i) {
+        vB[i] = A[i][0]*v_I[0] + A[i][1]*v_I[1] + A[i][2]*v_I[2];
+    }
 
-    //Err between measure and predict
-    // y = z - v_B
+    // Innovation y = z - vB
     double y[3];
-    y[0] = z[0] - vB[0];
-    y[1] = z[1] - vB[1];
-    y[2] = z[2] - vB[2];
+    for (int i = 0; i < 3; ++i) y[i] = z[i] - vB[i];
 
-    // H = -[vB]_x
+    // H = -[vB]_x  (skew symmetric)
     double H[3][3];
     skew(vB, H);
-    for(int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
             H[i][j] = -H[i][j];
-        }
-    }
-    
-    //Kalman gain
-    //K = PH^T(HPH^T + R)^-1
-    //S = HPH^T + R
-    double S[3][3] = {{0}};
+
+    // Compute PHt = P * H^T  (3x3)
+    double PHt[3][3] = {{0}};
     for (int i = 0; i < 3; ++i) {
-        for(int j = 0; j < 3; ++j) {
+        for (int j = 0; j < 3; ++j) { // column of H^T -> row of H
             for (int k = 0; k < 3; ++k) {
-                S[i][j] += H[i][k] * model->P[k][0] * H[j][0] + H[i][k] * model->P[k][1] * H[j][1] + H[i][k] * model-> P[k][2] * H[j][2];  
+                PHt[i][j] += model->P[i][k] * H[j][k];
             }
         }
     }
+
+    // Compute S = H * PHt + R   (3x3)
+    double S[3][3] = {{0}};
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
+            for (int k = 0; k < 3; ++k) {
+                S[i][j] += H[i][k] * PHt[k][j];
+            }
             S[i][j] += R[i][j];
         }
     }
-    //S^-1
+
+    // Invert S
     double invS[3][3];
     if (!matrix3_inverse(S, invS)) {
-        printf("WARNING:: inverse uncessfully, skip update \n");
+        printf("WARNING:: S inverse failed, skip update\n");
         return;
     }
-    //K = PH^T S^-1
+
+    // Compute K = PHt * invS   (3x3)
     double K[3][3] = {{0}};
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
-            for(int k = 0; k < 3; ++k) {
-                K[i][j] += model->P[i][k] * H[j][k] * invS[j][j];
+            for (int k = 0; k < 3; ++k) {
+                K[i][j] += PHt[i][k] * invS[k][j];
             }
         }
     }
-    // a = Ky
-    double a[3] = {0};
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            a[i] += K[i][j] * y[j];
-        }
-    }
 
-    //Attitude Fix
-    Quaternion dquat;
-    Quaternion nquat;
+    // a = K * y  (3x1)  — attitude error vector in small-angle form
+    double a[3] = {0};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            a[i] += K[i][j] * y[j];
+
+    // Attitude correction: integrate small error into quaternion
+    Quaternion dquat, nquat;
     errvec2quat(a, &dquat);
     nquat = quatMultiply(dquat, model->q);
-    model->q.x = nquat.x;
-    model->q.y = nquat.y;
-    model->q.z = nquat.z;
-    model->q.w = nquat.w;
+    model->q = nquat;
     quatNormalize(&model->q);
+
+    // Update covariance P using Joseph form: P = (I-KH) P (I-KH)^T + K R K^T
+    double IminusKH[3][3];
+    // compute KH first for convenience
+    double KH[3][3] = {{0}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                KH[i][j] += K[i][k] * H[k][j];
+
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            IminusKH[i][j] = (i == j ? 1.0 : 0.0) - KH[i][j];
+
+    // temp = (I-KH) * P
+    double temp[3][3] = {{0}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                temp[i][j] += IminusKH[i][k] * model->P[k][j];
+
+    // P_new = temp * (I-KH)^T
+    double P_new[3][3] = {{0}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                P_new[i][j] += temp[i][k] * IminusKH[j][k];
+
+    // Add K*R*K^T term
+    double KR[3][3] = {{0}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                KR[i][j] += K[i][k] * R[k][j];
+
+    double KRKT[3][3] = {{0}};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            for (int k = 0; k < 3; ++k)
+                KRKT[i][j] += KR[i][k] * K[j][k];
+
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            model->P[i][j] = P_new[i][j] + KRKT[i][j];
 }
 
 void MEKF_step(MEKF *model, const double omega[3], double dt, const double z[3], const double v_I[3], const double Q[3][3], const double R[3][3]) {
     mekf_predict(model, omega, dt, Q);
-    update(model, z, v_I, R);
+    mekf_update(model, z, v_I, R);
 }

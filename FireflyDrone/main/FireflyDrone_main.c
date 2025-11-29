@@ -12,7 +12,7 @@
 
 static const char *TAG = "board";
 
-#define MKEF_FILTER_TIME_STEP           0.01 // second
+#define MKEF_FILTER_TIME_STEP           0.1 // second
 #define PI                              3.1415926575
 
 const double Q[3][3] = {
@@ -28,7 +28,7 @@ const double R[3][3] = {
 };
 
 Quaternion q = {1.0, 0.0, 0.0, 0.0};
-float roll, pitch, yaw;
+double roll, pitch, yaw;
 double gyro_sens = 131.0;
 
 
@@ -43,15 +43,15 @@ void mpu6050_task(void *arg) {
 
     while(true) {
         mpu6050_read_raw(dev, &raw);
-        quatGyroUpdate(&q, raw.gx / gyro_sens * (PI / 180.0), raw.gy, raw.gz, 0.01);
+        // quatGyroUpdate(&q, raw.gx / gyro_sens * (PI / 180.0), raw.gy, raw.gz, 0.01);
 
         ESP_LOGI(TAG, "Accel: [%d %d %d], Gyro: [%d %d %d]",
                  raw.ax, raw.ay, raw.az,
                  raw.gx, raw.gy, raw.gz);
         
-        // MEKF_filter(MKEF_FILTER_TIME_STEP, Q, R, &raw);
+        MEKF_filter(MKEF_FILTER_TIME_STEP, Q, R, &raw, &roll, &pitch, &yaw);
         
-        quatToEulerFloat(q, &roll, &pitch, &yaw);
+        // quatToEulerFloat(q, &roll, &pitch, &yaw);
         
         ESP_LOGI(TAG, "roll:  %.2f, pitch:  %.2f, yaw:  %.2f]", roll, pitch, yaw);
 
