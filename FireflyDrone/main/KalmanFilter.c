@@ -86,6 +86,7 @@ void mekf_predict(MEKF *model, const double omega[3], double dt, const double Q[
     errvec2quat(phi, &dquat);
     //update quats
     nquat = quatMultiply(dquat, model->q);
+    quatNormalize(&model->q);
     
     model->q.x = nquat.x;
     model->q.y = nquat.y;
@@ -154,7 +155,7 @@ void mekf_update(MEKF *model, const double z[3], const double v_I[3], const doub
     // Invert S
     double invS[3][3];
     if (!matrix3_inverse(S, invS)) {
-        printf("WARNING:: S inverse failed, skip update\n");
+        printf("S inverse failed, skip update\n");
         return;
     }
 
@@ -221,10 +222,14 @@ void mekf_update(MEKF *model, const double z[3], const double v_I[3], const doub
             for (int k = 0; k < 3; ++k)
                 KRKT[i][j] += KR[i][k] * K[j][k];
 
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            model->P[i][j] = P_new[i][j] + KRKT[i][j];
-}
+    for (int i = 0; i < 3; ++i){
+        for (int j = 0; j < 3; ++j) {
+           double v = 0.5*(model->P[i][j] + model->P[j][i]);
+            model->P[i][j] = v;
+            model->P[j][i] = v; 
+        }
+    }
+}            
 
 void MEKF_step(MEKF *model, const double omega[3], double dt, const double z[3], const double v_I[3], const double Q[3][3], const double R[3][3]) {
     mekf_predict(model, omega, dt, Q);
