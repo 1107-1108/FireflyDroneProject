@@ -121,25 +121,25 @@ KV值是什么？KV是外加1v电压对应的每分钟空转转速。KV越小，
 
 以下材料都能从淘宝上购买
 
-机架: F450-V2 DJI    单价40RMB
 
-​      脚架            *4   8.99RMB
 
-电机: 新西达A2212 1400KV 单价30 *4
+机架: 自己造, 白嫖学校的材料
 
-电调: SKYWALKER 40A V2-UBEC 单价 67 *4
+​      脚架            *4   自己造，白嫖学校的材料
 
-六轴姿态传感器: MPU6050 单价60
+电机: TODO
 
-气压计: GY-63 单价21.8
+电调: 自己造，嘉立创
 
-主控: Raspberry Pi Zero2W 单价143
+六轴姿态传感器: MPU6050 单价30
 
-信号传输模块: DL-43P 2.4G   单价46.8 *2
+气压计: TODO
 
-​               HC-14          单价31.8 *2
+主控: ESP32-S3, 单价TODO
 
-桨叶: 1147 单价12*3
+信号传输模块: TODO
+
+桨叶: 自己造，白嫖学校的材料
 
 BB响
 
@@ -367,317 +367,151 @@ $$
 
 #### 四元数
 
-四元数有四个自由量，能够完美的解决万向锁的问题。
-
-四元数可以表示为 $ q = a + bi + cj + dk (a,b,c,d \in\mathbb{R}) $
-
-并且，在姿态解算中，四元数避免了大量的三角函数运算，那样的话对于处理器来讲简单的算数当然快
-
-四元数解欧拉角公式:
-
+四元数的定义是
 $$
-\left\{\begin{array}{cc}
-	\theta = arcsin|2(q_{0}q_{2} - q_{1}q_{3})| \\
-	\gamma = arctan(\frac{q_{0}q_{3}+q_{1}q_{2}}{1-2(q^2_2 + q2^2_2)}) \\
-	\psi = arctan(\frac{q_{0}q_{1}+q_{2}q_{3}}{1-2(q^2_1+q^2_2)})
-\end{array}\right.
+q = a + bi + cj + dk (a, b, c, d \in \mathbb{R})
 $$
-
-#### 两种坐标系
-
-常用导航坐标系分为两种，北东地和东北天
-
-北东地，x轴指向北，y轴指向东，z轴指向地
-
-东北天，x轴指向东，y轴指向北，z轴指向天
-
-**北东地** 
-
-欧拉角旋转顺序：ZYX（Yaw-Pitch-Roll)
-
-第一个转动角度，偏航角，旋转矩阵为
-
+也可以写成向量的模式
 $$
-R_\psi = 
-\left [
-\begin {matrix}
-	cos(\psi) & sin(\psi) & 0 \\
-	-sin(\psi) & cos(\psi) & 0 \\
-	0 & 0 & 1
-\end {matrix}
-\right ]
+\left [ \begin{matrix}
+a \\
+b \\
+c \\
+d \\
+\end{matrix} \right ] 
+= [s, v], 
+v = \left [ \begin{matrix}
+b \\
+c \\
+d \\
+\end{matrix} \right ],
+s, x, y, z \in \mathbb{R}
 $$
+其中，$i^2 = j^2 = k^2 = ijk $
 
-第二个转动角度，俯仰角，旋转矩阵为
-
+四元数归一化就是
 $$
-R_\theta = 
-\left [
-\begin {matrix}
- cos(\theta) & 0 & -sin(\theta) \\
- 0 & 1 & 0 \\
- sin(\theta) & 0 & cos(\theta)
-\end {matrix}
-\right ]
+||q|| = \sqrt{a^2+b^2+c^2+d^2}
 $$
-
-第三个转动角度，横滚角，旋转矩阵为
-
+四元数的乘法也很简单
 $$
-R_\gamma = 
-\left [
-\begin {matrix}
-	1 & 0 & 0 \\
-	0 & cos(\gamma) & sin(\gamma)\\
-	0 & -sin(\gamma) & cos(\gamma)
-\end {matrix}
-\right ]
+q1 = a + bi + cj + dk
+\\
+q2 = e + fi + gj + hk
+\\
+q1q2 = (ae-bf-cg-dk)+(be+af-dg+ch)i+(ce+df+ag-bh)j+(de-cf+bg+ah)k
 $$
-
-所以姿态矩阵为$$ R_\theta \times R_\psi \times R_\gamma $$， 过程不写了，直接上结果，旋转矩阵为
-
+也可以写成矩阵
 $$
-R = 
-\left [
-\begin {matrix}
-cos(\theta)cos(\psi) & -cos(\gamma)sin(\psi) + sin(\gamma)sin(\theta)cos(\psi) & sin(\gamma)sin(\psi) + cos(\gamma)sin(\theta)cos(\psi) \\
-cos(\theta)sin(\psi) & cos(\gamma)cos(\psi) + sin(\gamma)sin(\theta)sin(\psi) & -sin(\gamma)cos(\psi)+cos(\gamma)sin(\theta)sin(\psi) \\
--sin(\theta) & sin(\gamma)cos(\theta) & cos(\gamma)cos(\theta)
-\end {matrix}
-\right ]
+q1q2 = \left [ \begin{matrix}
+a&-b&-c&-d \\
+b&a&-d&c \\
+c&d&a&-b \\
+d&-c&b&a \\
+\end{matrix} \right ]
+\left [ \begin{matrix}
+e \\
+f \\
+g \\
+h \\
+\end{matrix} \right ]
 $$
+**纯四元数**: $v = [0, v]$, 两个纯四元数乘法就是$vu = [-vu, vu], v=[0, v], u=[0, u]$
 
-记作
+因为四元数不遵循交换律，所以
 
-$$
-R^n_b = 
-\left [
-\begin {matrix}
-R_{11} & R_{12} & R_{13} \\
-R_{21} & R_{22} & R_{23} \\
-R_{31} & R_{32} & R_{33}
-\end {matrix}
-\right ]
-$$
+四元数的除法就是$pq^{-1}$或者$q^{-1}p$, 其中$q^{-1}$是逆四元数，且$qq^{-1} = q^{-1}q = 1(q \neq 0)$
 
-三个姿态角计算公式为：
+**共轭**
 
-Roll: $$ \gamma = atan2(R_{32}, R_{33}) $$
-
-Pitch: $$\theta = -asin(R_{31}) $$
-
-Yaw: $$\psi = atan2(R_{21}, R_{11})$$
-
-**东北天**
-
-懒得写，晚点写
-
+给出四元数$q = a + bi + cj + dk$, 它的共轭是$q^* = a - bi - cj - dk$
 
 
 ### 3.2 姿态调解
 
-思路： 使用六轴传感器得到加速度和角速度，先对角速度积分得到角度，然后对加速度进行正交分解得到角度。对角速度积分方法得到角度会存在零点偏差和积分误差，而对加速度正交分解法，高频性能差，容易被噪声干扰。因此，通过融合两个数据来获得准确姿态。
+思路: 这里采用的传感器是MPU6050, 包含两种数据: 角速度计和加速度计，因为如果单纯用角速度计数据容易因为各种因素而漂移，所以我们需要用滤波来实现稳定数据，通过加速度计数据来补偿漂移，从而得到平滑的数据
 
-#### 步骤们
+有很多种滤波，比如互补滤波，Mahony滤波，本文使用卡尔曼滤波。对于三维旋转物体而言Extended Multiplication Kalman Filter是最合适的卡尔曼滤波。
 
-1. 初始化四元数
-2. 获取角速度(Gyro), 加速度(Acc)，并对其进行单位化
-3. 积分误差，用于补偿陀螺仪数据的漂移
-4. 融合误差
-5. 更新四元数并归一化
-6. 四元数转欧拉角
+卡尔曼滤波分为两大部分，预测与更新
 
-#### 步骤一 初始化四元数
-
-网上大部分教程都是默认初始化q0=1, q1=0, q2=0, q3=0, 但是这是默认无人机起飞时水平放置在地上。这里给出初始化四元数的公式，只要把已知载体姿态角代进去就行。
-
-$$ q0 = cos(\frac{\gamma}{2})cos(\frac{\theta}{2})cos(\frac{\psi}{2}) + sin(\frac{\gamma}{2})sin(\frac{\theta}{2})sin(\frac{\psi}{2})$$
-
-$$ q1 = sin(\frac{\gamma}{2})cos(\frac{\theta}{2})cos(\frac{\psi}{2}) - cos(\frac{\gamma}{2})sin(\frac{\theta}{2})sin(\frac{\psi}{2})$$
-
-$$q2 = cos(\frac{\gamma}{2})sin(\frac{\theta}{2})cos(\frac{\psi}{2}) + sin(\frac{\gamma}{2})cos(\frac{\theta}{2})sin(\frac{\psi}{2})$$
-
-$$q3 = cos(\frac{\gamma}{2})cos(\frac{\theta}{2})sin(\frac{\psi}{2})+sin(\frac{\gamma}{2})sin(\frac{\theta}{2})cos(\frac{\psi}{2})$$
-
-并且，姿态解算需要实时更新四元数， 需要通过构造一个四元数关于时间的微分方程。这里使用的是一阶龙格库塔法（我不会推，上公式）
-
+因为四元数不是线性的，所以我们把传感器数据视为真实数据乘一个小角误差
 $$
-\left [
-\begin {matrix}
-	q0 \\
-	q1 \\
-	q2 \\
-	q3 
-\end {matrix}
-\right ]_{t + \bigtriangleup t}
-= 
-\left [
-\begin {matrix}
-	q0 \\
-	q1 \\
-	q2 \\
-	q3 
-\end {matrix}
-\right ]_{t}
- +
- \frac{\bigtriangleup t}{2}
- \left [
- \begin {matrix}
- 	- \omega_x q1 - \omega_y q2 -\omega_x q3 \\
- 	\omega_x q0 + \omega_x q2 - \omega_y q3 \\
- 	\omega_y q0 - \omega_x q1 + \omega_x q3 \\
- 	\omega_x q0 + \omega_y q1 - \omega_x q2
- \end {matrix}
- \right ]
+q = \hat q \otimes \delta q
 $$
 
+#### 预测
 
-#### 步骤二 获取角速度，角速度并对其单位化
-
-省略，上代码
-
-```c++
-norm = sqrt(ax*ax + ay*ay + az*az);
-ax = ax / norm;
-ay = ay / norm;
-az = az / norm;
-```
-
-#### 步骤三&步骤四：积分误差并融合误差
-
-现在，我们有了四元数，如果陀螺仪给的角速度没有误差，那么实际重力加速度应该是等于理论重力加速度的，但是角速度数据存在漂移。
-
-这个时候，我们使用叉乘来算出误差。
-
-为什么要使用叉乘来计算误差呢？因为叉乘的代数形式是这样的 $ A  \times B = \left| A \right| \left| B \right| sin \theta$
-
-通常$\theta$是比较小的，如果两个单位向量完全平行那么误差为零，如果不平行，存在小角度误差，那么可以用Small Angle Approximation $sin \theta \approx \theta $。
-
-（这里不用再提向量版本的叉乘公式了吧，就是a(x1, y1), b(x2, y2), err = x1 * y2 - x2 * y1)
-
-这里上代码
-
-```cpp
-ex = (ay * vz - az * vy);
-ey = (az * vx - ax * vz);
-ez = (ax * vy - ay * vx);
-```
-
-~~很简单，不是吗？~~
-
-然后，得到向量偏差后，可以通过构建PI(Proportion, Integration)来计算补偿值
-
-$$ GyroError = K_p \times Error + K_I \times \int error$$
-
-其中Kp用于调节系统响应速度，KI用于消除静差。
-
-Kp越大，震荡越大，系统响应速度越大。（也就是Kp越大系统越相信加速度计，越小则越信任陀螺仪）
-
-继续上代码
-
-```cpp
-exInt = exInt + ex * Ki_IMU;
-eyInt = eyInt + ey * Ki_IMU;
-ezInt = ezInt + ez * Ki_IMU;
-
-gx = gx + Kp_IMU * ex + exInt;
-gy = gy + Kp_IMU * ey + eyInt;
-gz = gz + Kp_IMU * ez + ezInt;
-```
-
-#### 步骤五 四元数更新与归一化
-
-使用前面提到的公式对四元数进行更新
-
+给角速度$\omega = [\omega_x, \omega_y, \omega_z]$和同步时间 $dt$, 生成小角误差四元数`dquat`
 $$
-\left [
-\begin {matrix}
-	q0 \\
-	q1 \\
-	q2 \\
-	q3 
-\end {matrix}
-\right ]_{t + \bigtriangleup t}
-= 
-\left [
-\begin {matrix}
-	q0 \\
-	q1 \\
-	q2 \\
-	q3 
-\end {matrix}
-\right ]_{t}
- +
- \frac{\bigtriangleup t}{2}
- \left [
- \begin {matrix}
- 	- \omega_x q1 - \omega_y q2 -\omega_x q3 \\
- 	\omega_x q0 + \omega_x q2 - \omega_y q3 \\
- 	\omega_y q0 - \omega_x q1 + \omega_x q3 \\
- 	\omega_x q0 + \omega_y q1 - \omega_x q2
- \end {matrix}
- \right ]
+\phi = \omega \times dt
+\\
+\theta = |\phi|
+\\
+dquat = 
+
+\left\{  
+             \begin{array}{**lr**}  
+             \omega = 1, x = 0.5 *\phi_x, y = 0.5*\phi_y, z = 0.5*\phi_z, if \hspace{0.3em} \theta \approx 0  \\
+             \omega = cos(\theta / 2), x = \frac{\phi_x sin(\theta/2)}{\theta}, .....
+             \end{array}  
+\right.  
+$$
+更新四元数
+$$
+q \leftarrow q \otimes dquat
 $$
 
-很简单，上代码即可
+#### 更新
 
-```cpp
-q0 = q0 + Time_Period * (-q1 * gx - q2 * gy - q3 * gz);
-q1 = q1 + Time_Period * (q0 * gx + q2 * gz - q3 * gy);
-q2 = q2 + Time_Period * (q0 * gy - q1 * gz + q3 * gx);
-q3 = q3 + Time_Period * (q0 * gz + q1 * gy - q2 * gx);
-```
+1. 预测测量
+   $$
+   v_b = A * v_I
+   $$
 
-然后归一化
+2. Innovation
+   $$
+   y = z - v_B
+   $$
+   
 
-```cpp
-norm = sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
-q0 = q0 / norm;
-q1 = q1 / norm;
-q2 = q2 / norm;
-q3 = q3 / norm;
-```
+3. 构建测量矩阵
+   $$
+   H = -[v_B]_\times
+   $$
+   
 
-#### 步骤六 四元数转欧拉角
+4. 卡尔曼增益
+   $$
+   K = PH^T(HPH^T+R)^{-1}
+   $$
 
-还记得我们之前提的四元数转欧拉角公式吗？
+5. 小角误差
+   $$
+   a = K_y
+   $$
 
-$$
-\left\{\begin{array}{cc}
-	\theta = arcsin|2(q_{0}q_{2} - q_{1}q_{3})| \\
-	\gamma = arctan(\frac{q_{0}q_{3}+q_{1}q_{2}}{1-2(q^2_2 + q2^2_2)}) \\
-	\psi = arctan(\frac{q_{0}q_{1}+q_{2}q_{3}}{1-2(q^2_1+q^2_2)})
-\end{array}\right.
-$$
+6. 小角修正四元数
+   $$
+   errquat = errvec2quat(a)
+   $$
+   
 
-这里给他写成代码，就是
+7. 更新四元数
+   $$
+   q \leftarrow q \otimes errquat
+   $$
+   
 
-```cpp
-pitch = sin(-2 * q1 * q3 + 2 * q0 * q2) * 57.3;
-roll = atan2(2 * q2 * q3 + 2 * q0 * q1, -2 * q1 * q1 - 2 * q2* q2 + 1)* 57.3;
-```
+8. 更新协方差P
+   $$
+   P = (I - KH)P(I-KH)^T+KRK^T
+   $$
+
+### 3.3 控制理论
 
 
 
-### 3.3 PID
-
-PID是Proportion, integration, derivative。Proportion是对当前时刻的误差进行比例放大，Integration是对过去所有时间的偏差进行积分，Derivative是通过对偏差的微分，对控制系统的输出走向进行预判，起到超前调节的作用。
-
-因为作者理解能力与时间有限，故第一个版本使用三个单级PID来控制。
-
-#### Proportion
-
-作用: 比例是对当前时刻的误差进行比例放大
-
-假设系统在某个时刻从传感器获得的值为 $X_n $ (E.g. $X_1, X_2, X_3 ... X_n$ )
-
-那么第$\alpha$时刻的误差就是$error(\alpha) = Exp(\alpha) - X_\alpha$
-
-p环节的输出就是$u(\alpha) = Kp * error(\alpha)$
-
-其中Kp是Proportion比例系数，就是放大倍数
-
-#### Integration
 
 
 
