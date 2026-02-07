@@ -30,7 +30,11 @@ FireflyDroneProject/
 
 │       ├── mpu6050.c mpu6050传感器库
 
-│       └── quaternion.c 四元数支持库
+│       ├── quaternion.c 四元数支持库
+
+│       ├── pid.cpp PID控制算法
+
+|       └── FireflyLink.c 遥控信号(开发中)
 
 
 

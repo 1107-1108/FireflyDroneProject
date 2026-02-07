@@ -56,3 +56,5 @@ void generate_ecc(uint8_t *payload, int len, uint8_t *ecc_out) {
         ecc_out[ecc_index++] = (p1 << 2) | (p2 << 1) | p3;
     }
 }
+
+
