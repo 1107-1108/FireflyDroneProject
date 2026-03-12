@@ -9,6 +9,8 @@
 #include "FireflyDrone_main.h"
 #include "AttitudeCtrl.h"
 #include "quaternion.h"
+#include "nrf24L01.h"
+#include "driver/spi_master.h"
 
 static const char *TAG = "board";
 
@@ -59,6 +61,45 @@ void mpu6050_task(void *arg) {
     }
 }
 
+void nrf24_task(void *arg) {
+    nrf24_config_t cfg = {
+        .pin_miso = 13,
+        .pin_mosi = 11,
+        .pin_sck = 12,
+        .pin_csn = 10,
+        .pin_ce = 9,
+        .pin_irq = -1,
+        .spi_host = SPI2_HOST,
+    };
+
+    uint8_t addr[5] = {'N', 'R', 'F', '2', '4'};
+
+
+    ESP_ERROR_CHECK(nrf24_init(&cfg));
+    ESP_ERROR_CHECK(nrf24_set_channel(76));
+    ESP_ERROR_CHECK(nrf24_set_tx_addr(addr, 5));
+    ESP_ERROR_CHECK(nrf24_set_rx_addr_p0(addr, 5)); 
+    ESP_ERROR_CHECK(nrf24_print_regs());
+
+    uint32_t cnt = 0;
+    uint8_t tx_buf[32];
+
+    while(true) {
+        memset(tx_buf, 0, sizeof(tx_buf));
+        snprintf((char *)tx_buf, sizeof(tx_buf), "hello %04lu", (unsigned long)cnt++);
+
+        esp_err_t ret = nrf24_send(tx_buf, 32);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "send ok: %s", tx_buf);
+        } else {
+            ESP_LOGE(TAG, "send failed: %s", esp_err_to_name(ret));
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 void app_main(void) {
-    xTaskCreate(mpu6050_task, "mpu6050_task", 4096, NULL, 5, NULL);
+    //xTaskCreate(mpu6050_task, "mpu6050_task", 4096, NULL, 5, NULL);
+    xTaskCreate(nrf24_task, "nrf24_task", 4096, NULL, 5, NULL);
 }

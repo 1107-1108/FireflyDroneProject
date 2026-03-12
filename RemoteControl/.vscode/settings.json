@@ -6,5 +6,14 @@
     "--query-driver=**",
     "--compile-commands-dir=/home/a1107/Projects/FireflyDroneProject/RemoteControl/build"
   ],
-  "idf.currentSetup": "/home/a1107/esp/v5.5.1/esp-idf"
+  "idf.currentSetup": "/home/a1107/esp/v5.5.1/esp-idf",
+  "idf.flashType": "UART",
+  "idf.openOcdConfigs": [
+    "interface/ftdi/esp_ftdi.cfg",
+    "target/esp32s3.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "idf.port": "/dev/ttyACM1"
 }
