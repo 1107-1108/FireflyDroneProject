@@ -1,0 +1,10 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "clangd.path": "/home/a1107/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=**",
+    "--compile-commands-dir=/home/a1107/Projects/FireflyDroneProject/RemoteControl/build"
+  ],
+  "idf.currentSetup": "/home/a1107/esp/v5.5.1/esp-idf"
+}

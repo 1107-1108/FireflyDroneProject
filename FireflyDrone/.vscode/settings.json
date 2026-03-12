@@ -24,5 +24,6 @@
     "sdkconfig.h": "c",
     "i2c_master.h": "c"
   },
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "idf.currentSetup": "/home/a1107/esp/v5.5.1/esp-idf"
 }
