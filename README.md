@@ -1,18 +1,15 @@
-# 无人机项目
+# Firefly Quadcopter drone
 
 
 
-🛠️  开发中....
+🛠️  Developing...
 
-如果有任何建议请联系[1107@siwg.top](mailto:1107@siwg.top)
+Any suggestions or bug report please contact [1107@siwg.top](mailto:1107@siwg.top)
+
+Thanks a lot for support from @Li3_Fish(CN-Version Document Review) and @RT-TO(PID lib)!
 
 
-
-🛠️ Developing...
-
-Any ideas or suggestions please contact [1107@siwg.top](mailto:1107@siwg.top)
-
-## 主程序代码
+## Project Structure
 
 FireflyDroneProject/
 
@@ -22,19 +19,19 @@ FireflyDroneProject/
 
 │   └── main/ 
 
-│       ├── AttitudeCtrl.c 姿态解算 
+│       ├── AttitudeCtrl.c Attitude Estimation
 
-│       ├── FireflyDrone_main.c 主控系统
+│       ├── FireflyDrone_main.c Main Control
 
-│       ├── KalmanFilter.c 卡尔曼滤波算法
+│       ├── KalmanFilter.c Kalman Filter Algorithm
 
-│       ├── mpu6050.c mpu6050传感器库
+│       ├── mpu6050.c mpu6050 sensor support lib
 
-│       ├── quaternion.c 四元数支持库
+│       ├── quaternion.c Quaternion Calculation lib
 
-│       ├── pid.cpp PID控制算法
+│       ├── pid.cpp PID contorl lib
 
-|       └── FireflyLink.c 遥控信号(开发中)
+|       └── FireflyLink.c Remote Control lib (Developing...)
 
 
 
