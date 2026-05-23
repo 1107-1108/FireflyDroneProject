@@ -12,6 +12,11 @@ Quaternion quatMultiply(Quaternion q1, Quaternion q2) {
 
 void quatNormalize(Quaternion *q) {
     double norm = sqrt(q->w*q->w + q->x*q->x + q->y*q->y + q->z*q->z);
+    if (norm < 1e-12) {
+        q->w = 1.0;
+        q->x = q->y = q->z = 0.0;
+        return;
+    }
     q->w /= norm;
     q->x /= norm;
     q->y /= norm;
